@@ -147,14 +147,14 @@ bark("performing HTML parsing");
 bark("performing auto URL parsing");
 		for (; *q; q++) {
 bark("Examining %c", *q);
-			if (q != s && isalnum(q[-1])) {
+			if ((q != s) && isalnum(q[-1])) {
 bark("Skipping");
 				Buffer_addch(p, *q);
 				continue;
 			}
 			proto 	= Buffer_init(5);	/* protocol */
 			domain 	= Buffer_init(15);	/* domain name */
-			url 	= Buffer_init(30);	/* location */
+//			url 	= Buffer_init(30);	/* location */
 			/* protocol */
 			for (t = q; *t && isalpha(*t); t++) {
 bark("pushing %c", *t);
@@ -167,6 +167,7 @@ bark("pushing %c", *t);
 bark("proto being freed (%s)", Buffer_get(proto));
 				/* reset protocol */
 				Buffer_free(&proto);
+				t = q;
 			}
 bark("proto: %s", Buffer_is_set(proto) ? Buffer_get(proto) : "(null)");
 			if (Buffer_is_set(proto)) {//&&
@@ -196,8 +197,7 @@ bark("// not found");
 //			if (!Buffer_is_set(proto))
 //				t = q;
 			/* www. */
-			if ((*t == 'w') && (t[1] == 'w') &&
-				(t[2] == 'w') && (t[3] == '.')) {
+			if (strncmp(t, "www.", 4) == 0) {
 				t += 4;
 bark("found www.");
 				Buffer_set(domain, "www.");
@@ -225,6 +225,7 @@ bark("domain looks valid, checking TLD completer");
 						&& in_vec(pos+1, prefs->auto_tlds)) {
 						if (*t == '/') {
 							/* location */
+							url = Buffer_init(10); /* default to average URL length */
 							Buffer_addch(url, '/');
 							while ((*++t != '\0') && !isspace(*t) &&
 								/*
@@ -236,17 +237,18 @@ bark("domain looks valid, checking TLD completer");
 								!ispunct(*t))) {
 								Buffer_addch(url, *t);
 							}
-						} else {
-							Buffer_free(&url);
 						}
 					}
 				} else {
-					Buffer_free(&domain);
+					/* invalid: domain must contain '.' */
+					goto CLEANUP;
 				}
 bark("url?");
+				/* should we lookup a DNS record for the domain? */
 				if (!in_a_href(s, q) && !in_a(s, q) &&
-					/* if the protocol was found, it must be allowed */
+					/* if the protocol was found, the TLD must be allowed */
 					((Buffer_is_set(proto) &&
+					(strcmp(Buffer_get()) == 0 || strcmp() == 0)
 					in_vec(Buffer_get(proto), prefs->allowed_protos)) ||
 					!Buffer_is_set(proto))) {
 bark("found url [proto: %s] [domain: %s] [loc: %s]",
@@ -261,9 +263,12 @@ bark("found url [proto: %s] [domain: %s] [loc: %s]",
 					
 					Buffer_append(p, domain);
 					if (Buffer_is_set(url)) {
-bark("URL found");
+bark("URL found: %s", Buffer_get(url));
 						Buffer_append(p, url);
-					} else {
+					} else if ((Buffer_is_set(proto) &&
+						((strcmp(Buffer_get(proto), "http://") == 0 ) ||
+						(strcmp(Buffer_get(proto), "https://") == 0)) ||
+						!Buffer_is_set(proto))) {
 bark("no URL found");
 						Buffer_addch(p, '/');
 					}
@@ -275,6 +280,7 @@ bark("no URL found");
 					q = t;
 				}
 			}
+CLEANUP:
 			Buffer_addch(p, *q);
 
 			if (Buffer_is_set(proto))
