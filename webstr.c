@@ -4,27 +4,34 @@
 #include "webstr.h"
 #include "buffer.h"
 
-static bool in_vec(char *needle, char **hay)
+static bool in_vec(char *needle, char **hay, int len, bool sens)
 {
 	char **p;
-bark("checking for vec presence");
-	for (p = hay; *p; p++) {
-bark("comparing %s to %s", needle, *p);
-		if (strcmp(needle, *p) == 0) {
-bark("found!");
-			return TRUE;
+	if (sens) {
+		if (len) {
+			for (p = hay; *p; p++)
+				if (strncmp(needle, *p, len) == 0)
+					return TRUE;
+		} else {
+			for (p = hay; *p; p++)
+				if (strcmp(needle, *p) == 0)
+					return TRUE;
+		}
+	} else {
+		if (len) {
+			for (p = hay; *p; p++)
+				if (strncasecmp(needle, *p, len) == 0)
+					return TRUE;
+		} else {
+			for (p = hay; *p; p++)
+				if (strcasecmp(needle, *p) == 0)
+					return TRUE;
 		}
 	}
 	return FALSE;
 }
 
-static bool in_a_href(char *needle, char *hay)
-{
-	bool found = FALSE;
-	return found;
-}
-
-static bool in_a(char *needle, char *hay)
+static bool in_html_tag(char *needle, char *hay)
 {
 	bool found = FALSE;
 	return found;
@@ -55,7 +62,7 @@ char *webstr_decode_html(char *s)
 				for (iter = map; iter->ent != '\0'; iter++) {
 					len = strlen(iter->esc);
 					if ((strncmp(t, iter->esc, len) == 0) &&
-						(t[len] == ';')) {
+					    (t[len] == ';')) {
 						/* found a match */
 						Buffer_addch(p, iter->ent);
 						t += len;
@@ -111,9 +118,9 @@ char *webstr_encode_html(char *s)
 
 		if (!found) {
 			if (strchr("abcdefghijklmnopqrstuvwxyz"
-				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				"0123456789"
-				"!@#$^*()`~-_=+{}[] \t\r\n\\|;:',./?", s[i]) != NULL)
+				   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				   "0123456789"
+				   "!@#$^*()`~-_=+{}[] \t\r\n\\|;:',./?", s[i]) != NULL)
 				/* valid char, pass it through */
 				Buffer_addch(p, s[i]);
 			else {
@@ -135,7 +142,6 @@ char *webstr_encode_html(char *s)
 /*
 	remove_html_attr
 	strip_html_attr
-*/
 
 char *webstr__attr_clean(char *s)
 {
@@ -143,12 +149,13 @@ char *webstr__attr_clean(char *s)
 	char *p;
 	int len = strlen(s);
 	q = Buffer_init(len);
-	/* decode_html */
-	/* remove css */
+// decode_html
+// remove css
 	p = xstrdup(Buffer_get(q));
 	Buffer_free(&q);
 	return p;
 }
+*/
 
 char *webstr_css_remove_expr(char *s)
 {
@@ -185,7 +192,7 @@ char *webstr_css_remove_expr(char *s)
 					}
 					r++;
 					break;
-					
+
 				case '\'':
 					while (isspace(*++r));
 					while ((*r != '\0') && (*r != '\''))
@@ -206,7 +213,7 @@ char *webstr_css_remove_expr(char *s)
 					break;
 			}
 			if (strncasecmp(Buffer_get(val), "expression", 10) != 0) {
-			Buffer_append(p, name);
+				Buffer_append(p, name);
 				Buffer_addch(p, ':');
 				Buffer_append(p, val);
 				Buffer_addch(p, ';');
@@ -347,6 +354,15 @@ bark("%s='%s'", Buffer_get(attrname), Buffer_get(attrval));
 							((attrval = VBuffer_remove(&attrvals)) != NULL)) {
 							for (allowedattr = iter->attrs; *allowedattr != NULL; allowedattr++) {
 								if (strcmp(Buffer_get(attrname), *allowedattr) == 0) {
+									/*
+									 * if attribute is targetted for protocol checking
+									 * and doesn't pass, move to next attribute
+									 */
+									if (in_vec(Buffer_get(attrname), prefs->attr_check_proto, 0, FALSE) &&
+									    ((x = strchr(Buffer_get(attrval), ':')) != NULL) &&
+									    in_vec(Buffer_get(attrval), prefs->allowed_protos,
+										   x - Buffer_get(attrval), FALSE))
+										goto NEXTATTR;
 									Buffer_addch(p, ' ');
 									Buffer_cat(p, *allowedattr);
 									Buffer_cat(p, "=\"");
@@ -448,11 +464,10 @@ bark("performing auto URL parsing");
 				} else if (*t == '/') {
 					t++;
 					Buffer_cat(proto, "//");
-				} else if (	(strcmp(Buffer_get(proto), "http:") == 0) ||
-						(strcmp(Buffer_get(proto), "https:") == 0)) {
+				} else if ((strcmp(Buffer_get(proto), "http:")  == 0) ||
+					   (strcmp(Buffer_get(proto), "https:") == 0)) {
 				//} else {
 //bark("// not found");
-
 					Buffer_free(&proto);
 				}
 			}
@@ -468,25 +483,25 @@ bark("performing auto URL parsing");
 			/* rest of domain */
 			if (isalnum(*t) || (*t == '-')) {
 				while (isalnum(*t) || (*t == '-') ||
-					(*t == '.'))
-						Buffer_addch(domain, *t++);
+				       (*t == '.'))
+					Buffer_addch(domain, *t++);
 //bark("domain: %s", Buffer_get(domain));
 //bark("domain looks valid, checking TLD completer");
 				/* valid TLD completer */
 				if (Buffer_is_set(domain) &&
-					((pos = strrchr(Buffer_get(domain), '.')) != NULL) &&
-					/* skip '.' and check TLD */
-					pos[1] != '\0') {
+				    ((pos = strrchr(Buffer_get(domain), '.')) != NULL) &&
+				    /* skip '.' and check TLD */
+				    pos[1] != '\0') {
 					/*
 					 * must match auto TLD if set to
 					 * http:// or not set
 					 * (inherent http link)
 					 */
 					if (((Buffer_is_set(proto) &&
-						((strcmp(Buffer_get(proto), "http://") == 0) ||
-						 (strcmp(Buffer_get(proto), "https://") == 0))) ||
-						 !Buffer_is_set(proto)) &&
-						 in_vec(pos+1, prefs->auto_tlds)) {
+					    ((strcmp(Buffer_get(proto), "http://") == 0) ||
+					     (strcmp(Buffer_get(proto), "https://") == 0))) ||
+					     !Buffer_is_set(proto)) &&
+					     in_vec(pos+1, prefs->auto_tlds, 0, TRUE)) {
 						if (*t == '/') {
 							/* location */
 							url = Buffer_init(10); /* default to average URL length */
@@ -513,13 +528,13 @@ bark("performing auto URL parsing");
 				}
 //bark("url?");
 				/* should we lookup a DNS record for the domain? */
-				if (!in_a_href(s, q) && !in_a(s, q) &&
-					/* if the protocol was found, the TLD must be allowed */
-					((Buffer_is_set(proto) &&
-				//	((strcmp(Buffer_get(proto), "http://") == 0) ||
-				//	(strcmp(Buffer_get(proto), "https://") == 0)) &&
-					in_vec(Buffer_get(proto), prefs->allowed_protos)) ||
-					!Buffer_is_set(proto))) {
+				if (!in_html_tag(s, q) &&
+				    /* if the protocol was found, the TLD must be allowed */
+				    ((Buffer_is_set(proto) &&
+//				    ((strcmp(Buffer_get(proto), "http://") == 0) ||
+//				    (strcmp(Buffer_get(proto), "https://") == 0)) &&
+				    in_vec(Buffer_get(proto), prefs->allowed_protos, 0, TRUE)) ||
+				    !Buffer_is_set(proto))) {
 //bark("found url [proto: %s] [domain: %s] [loc: %s]",
 //	Buffer_is_set(proto) ? Buffer_get(proto) : "DEFAULT",
 //	Buffer_get(domain), Buffer_is_set(url) ? Buffer_get(url) : "NONE");
@@ -535,9 +550,9 @@ bark("performing auto URL parsing");
 //bark("URL found: %s", Buffer_get(url));
 						Buffer_append(p, url);
 					} else if (((Buffer_is_set(proto) &&
-						((strcmp(Buffer_get(proto), "http://") == 0)  ||
-						(strcmp(Buffer_get(proto), "https://") == 0))) ||
-						!Buffer_is_set(proto))) {
+						   ((strcmp(Buffer_get(proto), "http://")  == 0) ||
+						    (strcmp(Buffer_get(proto), "https://") == 0))) ||
+						   !Buffer_is_set(proto))) {
 //bark("no URL found");
 						Buffer_addch(p, '/');
 					}
@@ -574,7 +589,7 @@ CLEANUP:
 			ignore = TRUE;
 		else if (*q == '>')
 			ignore = FALSE;
-		else if (!ignore)
+		else if (!ignore) {
 			if (*q == '\n') {
 				Buffer_cat(p, "<br />");
 				continue;
@@ -587,6 +602,7 @@ CLEANUP:
 				Buffer_cat(p, "<br />");
 				continue;
 			}
+		}
 		Buffer_addch(p, *q);
 	}
 	free(r);
