@@ -56,22 +56,25 @@ static bool in_a_tag(char *url, char *s)
 {
 	char *q = url;
 
-	__DECR(q);
+	/* locate last tag */
+	do {
+		__DECR(q);
+	} while (*q != '>');
 
-	if (*q == '>')
-		/* find beginning of tag */
-		while (q != s)
-			if ((*--q == '<') && ((q[1] == 'a') || (q[1] == 'A')) &&
-			    isspace(q[2])) {
+	if (q == s)
+		return FALSE;
+
+	/* find beginning of tag */
+	while (q != s)
+		if (*--q == '<') {
+			if (((q[1] == 'a') || (q[1] == 'A')) &&
+			    isspace(q[2]))
 			    	/* it's a link */
-bark("found end of a tag");
 				return TRUE;
-			} else {
-bark("found end of non-a tag");
+			else
 				/* end of tag, and the tag isn't an A */
 				return FALSE;
-			}
-bark("looks good ([%s] in [%s])!", url, s);
+		}
 	return FALSE;
 }
 
@@ -101,14 +104,13 @@ static bool in_a_href(char *url, char *s)
 	if (strncasecmp(q, "href", 4) != 0)
 		return FALSE;
 	while (q != s)
-		if (*--q == '<')
+		if (*--q == '<') {
 			if (((q[1] == 'a') || (q[1] == 'A')) &&
 			    isspace(q[2]))
 				return TRUE;
 			else
 				return FALSE;
-		else
-			return FALSE;
+		}
 	return FALSE;
 }
 
@@ -436,7 +438,7 @@ bark("%s='%s'", Buffer_get(attrname), Buffer_get(attrval));
 									 */
 									if (in_vec(Buffer_get(attrname), prefs->attr_check_proto, 0, FALSE) &&
 									    ((x = strchr(Buffer_get(attrval), ':')) != NULL) &&
-									    in_vec(Buffer_get(attrval), prefs->allowed_protos,
+									    !in_vec(Buffer_get(attrval), prefs->allowed_protos,
 										   x - Buffer_get(attrval), FALSE))
 										goto NEXTATTR;
 									Buffer_addch(p, ' ');
@@ -497,13 +499,18 @@ H_END:
 
 	if ((flags & STR_URL) && prefs->auto_urls) {
 		char *pos;
+		bool sawtag = FALSE;
 		Buffer *proto, *domain, *url = NULL;
 		p = Buffer_init(strlen(r));
 bark("performing auto URL parsing");
 		for (q = r; *q; q++) {
 //bark("Examining %c", *q);
-			if ((q != s) && isalnum(q[-1])) {
+			if (*q == '<')
+				sawtag = TRUE;
+			if (((q != s) && isalnum(q[-1])) || sawtag) {
 //bark("Skipping");
+				if (*q == '>')
+					sawtag = FALSE;
 				Buffer_addch(p, *q);
 				continue;
 			}
@@ -604,7 +611,8 @@ bark("performing auto URL parsing");
 				}
 //bark("url?");
 				/* should we lookup a DNS record for the domain? */
-				if (!in_a_tag(q, s) && !in_a_href(q, s) &&
+//				if (!in_a_tag(q, s) && !in_a_href(q, s) &&
+				if (!in_a_tag(q, s) &&
 				    /* if the protocol was found, the TLD must be allowed */
 				    ((Buffer_is_set(proto) &&
 //				    ((strcmp(Buffer_get(proto), "http://") == 0) ||
