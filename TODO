@@ -1,1 +1,2 @@
 check domain with gethostbyname() then gethostbyaddr()
+prevent link XSS - <a href="javascript:foo"></a>
