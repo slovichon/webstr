@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-	char *p, *q;
+	char *p;
 	struct webstr_prefs prefs;
 
 	prefs.auto_urls = TRUE;
