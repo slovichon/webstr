@@ -19,3 +19,12 @@ char *xstrdup(const char *s)
 	assert((p = strdup(s)) != NULL);
 	return p;
 }
+
+/* strcpy() for already allocated strings (re-copy) */
+int xstrecp(char **s, const char *p)
+{
+	int len = strlen(p)+1;
+	assert((*s = realloc(*s, len)) != NULL);
+	strncpy(*s, p, len);
+	return len;
+}
