@@ -48,6 +48,7 @@ struct webstr_prefs {
 	bool auto_urls;
 	char **auto_tlds;
 	char **allowed_protos;
+	char **attr_check_proto;
 	struct webstr_allowed_html *allowed_html;
 };
 

@@ -42,6 +42,14 @@ int main(int argc, char *argv[])
 
 	prefs.allowed_html[2].tag = NULL;
 
+	prefs.attr_check_proto = calloc(6, sizeof(char *));
+	prefs.attr_check_proto[0] = "href";
+	prefs.attr_check_proto[1] = "src";
+	prefs.attr_check_proto[2] = "data";
+	prefs.attr_check_proto[3] = "action";
+	prefs.attr_check_proto[4] = "link";
+	prefs.attr_check_proto[5] = NULL;
+
 /*
 	for (q = prefs.auto_tlds; *q; q++)
 		printf("%s\n", *q);
