@@ -42,15 +42,3 @@ int main(int argc, char *argv[])
 	free(p);
 	return 0;
 }
-
-void bark(char *msg, ...)
-{
-	va_list ap;
-	fprintf(stderr, "[ERR] ");
-	va_start(ap, msg);
-	(void)vfprintf(stderr, msg, ap);
-	va_end(ap);
-	fprintf(stderr, "\n");
-	(void)fflush(stderr);
-}
-
