@@ -8,8 +8,9 @@ int main(int argc, char *argv[])
 	char *p;
 	struct webstr_prefs prefs;
 
-	prefs.auto_urls = TRUE;
-	prefs.max_chars = 20;
+	prefs.auto_urls   = TRUE;
+	prefs.auto_emails = TRUE;
+	prefs.max_chars   = 20;
 
 	prefs.auto_tlds = calloc(4, sizeof(char *));
 	prefs.auto_tlds[0] = "co";
@@ -58,6 +59,9 @@ int main(int argc, char *argv[])
 //	"here is some content\n"
 //	"here are some <invalid> tags </invalid>\n"
 //	"here are some <valid> tags </valid>\n"
+//	"asdf http://www.bleh.com/myfavorite/dot.html asdf \r\n"
+//	"hello <a href=\"http://www.bleh.com/myfavorite/dot.html\">ignore me shithead</a> world\r\n"
+	"My e-mail is foo@closeedge.net \n\n"
 	//"asdf http://www.bleh.com/myfavorite/dot.html asdf \r\n"
 	"hello <a href=\"http://www.real.com/myfavorite/dot.html\">"
 		"http://www.fake.com/myfavorite/dot.html</a> world\r\n"

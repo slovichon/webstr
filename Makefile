@@ -1,14 +1,9 @@
 # $Id$
 
-SOURCES = buffer.c webstr.c str.c xalloc.c strtest.c
-OBJECTS = buffer.o webstr.o str.o xalloc.o strtest.o
-
-LIBS = -lm -lc
-
-TARGET = strtest
-
-#CFLAGS = -Wall -pedantic -O2 -ffast-math -pipe -march=i686 -fexpensive-optimizations
-CFLAGS = -Wall -pedantic -Wuninitialized -O
+OBJECTS = webstr.o str.o xalloc.o
+LIBS = -lm -lc -L../buffer -lbuffer -L. -lresolv
+CFLAGS = -Wall -I../buffer
+TARGET = libwebstr.so
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
@@ -16,7 +11,11 @@ CFLAGS = -Wall -pedantic -Wuninitialized -O
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(LIBS) -o $@ $(OBJECTS)
+	$(CC) -shared $(LIBS) -o $@ $(OBJECTS)
+	chmod 444 $@
+
+test: $(TARGET) strtest.o
+	$(CC) $(LIBS) -o strtest -lbuffer -lwebstr strtest.o
 
 clean:
-	rm -f strtest *.o
+	rm -f $(TARGET) $(OBJECTS) strtest.o strtest

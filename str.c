@@ -1,11 +1,9 @@
 /* $Id$ */
 
+#include <math.h>
+
 #include "webstr.h"
 #include "buffer.h"
-#include <assert.h>
-#include <stdio.h>
-#include <math.h>
-#include <string.h>
 
 char *itoa(int p)
 {
@@ -16,7 +14,7 @@ char *itoa(int p)
 		Buffer_addch(s, '0' + (p % 10));
 		p /= 10;
 	}
-	assert((r = strdup(Buffer_get(s))) != NULL);
+	r = xstrdup(Buffer_get(s));
 	strrev(r);
 	return r;
 }

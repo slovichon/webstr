@@ -1,10 +1,23 @@
+/* $Id$ */
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
+
 #include "webstr.h"
 #include "buffer.h"
 
-static bool in_vec(char *needle, char **hay, int len, bool sens)
+static bool_t mxvalid(char *host)
+{
+	unsigned char buf[NS_PACKETSZ];
+	res_init();
+	return res_search(host, C_IN, T_MX, buf, NS_PACKETSZ) > 0;
+}
+
+static bool_t in_vec(char *needle, char **hay, int len, bool_t sens)
 {
 	char **p;
 	if (sens) {
@@ -52,7 +65,7 @@ static bool in_vec(char *needle, char **hay, int len, bool sens)
  *
  *	<a href="url1">url2</a>
  */
-static bool in_a_tag(char *url, char *s)
+static bool_t in_a_tag(char *url, char *s)
 {
 	char *q = url;
 
@@ -72,9 +85,12 @@ static bool in_a_tag(char *url, char *s)
 			    	/* it's a link */
 				return TRUE;
 			else
-				/* end of tag, and the tag isn't an A */
+				/* beginning of non-anchor of tag */
 				return FALSE;
 		}
+
+bark("looks good ([%s] in [%s])!", url, s);
+
 	return FALSE;
 }
 
@@ -87,7 +103,7 @@ static bool in_a_tag(char *url, char *s)
  * shouldn't need to do any strange parsing (such as
  * optional quotes or whitespace, etc.).
  */
-static bool in_a_href(char *url, char *s)
+static bool_t in_a_href(char *url, char *s)
 {
 	char *q = url;
 	__DECR(q);
@@ -176,7 +192,7 @@ char *webstr_encode_html(char *s)
 	Buffer *p;
 	char *q, *seq;
 	int len, i, j;
-	bool found;
+	bool_t found;
 
 	/* encoding all invalid characters may expand it some */
 	len = strlen(s);
@@ -328,7 +344,7 @@ char *webstr_parse(char *s, int flags, struct webstr_prefs *prefs)
 		VBuffer *attrnames, *attrvals;
 		char *w, *x, *endtag, **allowedattr;
 		int endtaglen;
-		bool allowed;
+		bool_t allowed;
 		struct webstr_allowed_html *iter;
 
 bark("performing HTML parsing on %s", r);
@@ -497,10 +513,88 @@ H_END:
 		Buffer_long_free(&p, TRUE);
 	}
 
+	if ((flags & STR_EMAIL) && prefs->auto_emails) {
+		Buffer *email, *domain, *link;
+		int overread;
+
+bark("performing auto e-mail parsing");
+		p = Buffer_init(strlen(r));
+		for (q = r; *q != '\0'; q++) {
+			if (*q == '@') {
+				/* Search backwards for username */
+				t = q;
+				while ((t > r) && strchr("abcdefghijklmnopqrstuvwxyz"
+							 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+							 "0123456789-_.$", *--t) != NULL);
+				if ((t == q) || (++t == q))
+					goto E_SKIP;
+
+				email = Buffer_init(12);
+				link = NULL;
+				domain = NULL;
+
+				Buffer_set(email, "");
+				Buffer_cat_range(email, t, q);
+
+				/* Find domain */
+				t = q;
+				while (strchr("abcdefghijklmnopqrstuvwxyz"
+					      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+					      "0123456789-.", *++t) && *t);
+				if (t-1 == q) {
+					/* Oops, invalid domain */
+					Buffer_free(&email);
+				} else {
+					domain = Buffer_init(t-q);
+					Buffer_set_range(domain, q+1, t);
+					if (!mxvalid(Buffer_get(domain)))
+						goto E_INVALID;
+					Buffer_free(&domain);
+
+					overread = Buffer_length(email);
+					Buffer_chomp(p, overread);
+					Buffer_cat_range(email, q, t);
+					if (in_a_tag(Buffer_get(email), q-overread))
+						goto E_INVALID;
+
+					link = Buffer_init(Buffer_length(email)+7);
+					Buffer_set(link, "mailto:");
+					Buffer_append(link, email);
+					if (in_a_href(Buffer_get(link), q-overread))
+						goto E_INVALID;
+					Buffer_free(&link);
+
+					Buffer_cat(p, "<a href=\"mailto:");
+					Buffer_append(p, email);
+					Buffer_cat(p, "\">");
+					Buffer_append(p, email);
+					Buffer_cat(p, "</a>");
+
+					Buffer_free(&email);
+
+					q = t;
+					continue;
+				}
+
+E_INVALID:
+				if (link != NULL)
+					Buffer_free(&link);
+				Buffer_free(&email);
+			}
+
+E_SKIP:
+			Buffer_addch(p, *q);
+		}
+		free(r);
+		r = Buffer_get(p);
+		Buffer_long_free(&p, TRUE);
+	}
+
 	if ((flags & STR_URL) && prefs->auto_urls) {
 		char *pos;
-		bool sawtag = FALSE;
+		bool_t sawtag = FALSE;
 		Buffer *proto, *domain, *url = NULL;
+
 		p = Buffer_init(strlen(r));
 bark("performing auto URL parsing");
 		for (q = r; *q; q++) {
@@ -663,8 +757,6 @@ CLEANUP:
 		Buffer_long_free(&p, TRUE);
 	}
 
-	/* auto e-mail */
-
 	/* fix newlines */
 	p = Buffer_init(strlen(r));
 	ignore = FALSE;
@@ -698,11 +790,15 @@ bark("newlines fixed, doing run-ons now");
 	/* fix run-ons */
 	p = Buffer_init(strlen(r));
 	count = 0;
+	ignore = FALSE;
 	for (q = r; *q != '\0'; q++) {
 		/* a problem is (?:&#nbsp;)* */
+		if ((*q == '<') || (*q == '>'))
+			ignore = !ignore;
+
 		if (strchr("&<()> \t/!?|.,", *q) != NULL)
 			count = 0;
-		else
+		else if (!ignore)
 			count++;
 
 		if (count > prefs->max_chars) {
