@@ -235,6 +235,7 @@ char *webstr_parse(char *s, int flags, struct webstr_prefs *prefs)
 					t => incremental parse completer,
 					q => fail-back for incremental parse */
 	int count;		/* counting chars in max run-on chars */
+	int ignore;		/* whether to ignore chars in newline fixing */
 
 	r = webstr_encode_html(s);
 
@@ -566,34 +567,35 @@ CLEANUP:
 	/* auto e-mail */
 
 	/* fix newlines */
-{
-	int len, i;
-	len = strlen(r);
-	p = Buffer_init(len);
-	for (i = 0; i < len; i++)
-		if (r[i] == '\n') {
-			Buffer_cat(p, "<br />");
-		} else if ((r[i] == '\r') && (i+1 < len)
-				&& (r[i+1] == '\n')) {
-			Buffer_cat(p, "<br />");
-			i++;
-		/* try this last */
-		} else if (r[i] == '\r')
-			Buffer_cat(p, "<br />");
-		else
-			Buffer_addch(p, r[i]);
-bark("buf: %s", Buffer_get(p));
+	p = Buffer_init(strlen(r));
+	ignore = FALSE;
+	for (q = r; *q != '\0'; q++) {
+		if (*q == '<')
+			ignore = TRUE;
+		else if (*q == '>')
+			ignore = FALSE;
+		else if (!ignore)
+			if (*q == '\n') {
+				Buffer_cat(p, "<br />");
+				continue;
+			} else if ((*q == '\r') && (q[1] == '\n')) {
+				Buffer_cat(p, "<br />");
+				q++;
+				continue;
+			/* try this last */
+			} else if (*q == '\r') {
+				Buffer_cat(p, "<br />");
+				continue;
+			}
+		Buffer_addch(p, *q);
+	}
 	free(r);
 	r = Buffer_get(p);
 	Buffer_long_free(&p, TRUE);
-}
 
 bark("newlines fixed, doing run-ons now");
 
 	/* fix run-ons */
-
-//	lastpos = 0;
-//	bool found;
 	p = Buffer_init(strlen(r));
 	count = 0;
 	for (q = r; *q != '\0'; q++) {
@@ -604,38 +606,10 @@ bark("newlines fixed, doing run-ons now");
 			count++;
 
 		if (count > prefs->max_chars) {
-#if 0
-/*
- * this looks like it would be more acceptable
- * for newline-breaking text
- */
-			/* find previous character acceptable to break at */
-			found = FALSE;
-			for (j = i; j > lastpos; j++)
-				if (strchr("<(", r[j]) != NULL) {
-					/* insert before char */
-					Buffer_addch(p, ' ');
-					Buffer_addch(p, r[i]);
-					found = TRUE;
-					break;
-				} else if (strchr(">)", r[j]) != NULL) {
-					/* insert after char */
-					Buffer_addch(p, r[i]);
-					Buffer_addch(p, ' ');
-					found = TRUE;
-					break;
-				}
-
-			if (!found) {
-				/* must not have found a char, force break */
-#endif
-				Buffer_addch(p, ' ');
-				Buffer_addch(p, *q);
-//			}
+			Buffer_addch(p, ' ');
+			Buffer_addch(p, *q);
 			/* next char counts */
 			count = 1;
-			/* future's last replacement is here */
-//			lastpos = r-q;
 		} else {
 			Buffer_addch(p, *q);
 		}

@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-	char *p,*q;
+	char *p, *q;
 	struct webstr_prefs prefs;
 
 	prefs.auto_urls = TRUE;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
 	prefs.allowed_html[1].tag = "span";
 	prefs.allowed_html[1].attrs = calloc(5, sizeof(char *));
-	prefs.allowed_html[1].attrs[0] = "style";
+	prefs.allowed_html[1].attrs[0] = "class";
 	prefs.allowed_html[1].attrs[1] = "title";
 	prefs.allowed_html[1].attrs[2] = "id";
 	prefs.allowed_html[1].attrs[3] = "lang";
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 //	"here is some content\n"
 //	"here are some <invalid> tags </invalid>\n"
 //	"here are some <valid> tags </valid>\n"
-	"hello <span style=\"foo:bar; glarch:nilch; position:expression(...)\">there</span> world\n"
+	"hello <span class=\"badass\">there</span> world\r\n"
 //	"here is some \"miscellaneous\" & inappropriate >content<\n"
 //	" asdf gopher:comp.unix.bsd.openbsd.pf jkl;\n"
 //	"here is a <tag with=\"an\"> invalid attribute </tag>\n"
