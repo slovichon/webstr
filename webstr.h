@@ -38,12 +38,19 @@ struct webstr_ent_map {
 	char *esc;	/* escape sequence */
 };
 
+struct webstr_allowed_html {
+	char *tag;
+	char **attrs;
+};
+
 struct webstr_prefs {
 	size_t max_chars;
 	bool auto_urls;
 	char **auto_tlds;
 	char **allowed_protos;
+	struct webstr_allowed_html *allowed_html;
 };
+
 
 #if !defined(HAS_ITOA)
 char *itoa(int p);

@@ -8,7 +8,7 @@ LIBS = -lm -lc
 TARGET = strtest
 
 #CFLAGS = -Wall -pedantic -O2 -ffast-math -pipe -march=i686 -fexpensive-optimizations
-CFLAGS = -Wall -pedantic 
+CFLAGS = -Wall -pedantic -Wuninitialized -O
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
