@@ -9,7 +9,7 @@ static bool in_vec(char *needle, char **hay)
 	char **p;
 bark("checking for vec presence");
 	for (p = hay; *p; p++) {
-bark("comparing %s\n to %s", needle, *p);
+bark("comparing %s to %s", needle, *p);
 		if (strcmp(needle, *p) == 0) {
 bark("found!");
 			return TRUE;
@@ -152,9 +152,9 @@ bark("Skipping");
 				Buffer_addch(p, *q);
 				continue;
 			}
-			proto = Buffer_init(5);		/* protocol */
-			domain = Buffer_init(15);	/* domain name */
-			url = Buffer_init(30);		/* location */
+			proto 	= Buffer_init(5);	/* protocol */
+			domain 	= Buffer_init(15);	/* domain name */
+			url 	= Buffer_init(30);	/* location */
 			/* protocol */
 			for (t = q; *t && isalpha(*t); t++) {
 bark("pushing %c", *t);
@@ -169,10 +169,10 @@ bark("proto being freed (%s)", Buffer_get(proto));
 				Buffer_free(&proto);
 			}
 bark("proto: %s", Buffer_is_set(proto) ? Buffer_get(proto) : "(null)");
-			if (Buffer_is_set(proto) &&
-				((strcmp(Buffer_get(proto), "http:") == 0) ||
-				(strcmp(Buffer_get(proto), "https:") == 0))) {
-bark("looking for http://");
+			if (Buffer_is_set(proto)) {//&&
+				//((strcmp(Buffer_get(proto), "http:") == 0) ||
+				//(strcmp(Buffer_get(proto), "https:") == 0))) {
+bark("looking for //");
 				/* http and https require `//' (might be /// or /) */
 				if ((*t == '/') && (t[1] == '/')) {
 					t += 2;
@@ -184,14 +184,17 @@ bark("looking for http://");
 				} else if (*t == '/') {
 					t++;
 					Buffer_cat(proto, "//");
-				} else {
+				} else if (	(strcmp(Buffer_get(proto), "http:") == 0) ||
+						(strcmp(Buffer_get(proto), "https:") == 0)) {
+				//} else {
 bark("// not found");
+					
 					Buffer_free(&proto);
 				}
 			}
 			/* restart if protocol wasn't found */
-			if (!Buffer_is_set(proto))
-				t = q;
+//			if (!Buffer_is_set(proto))
+//				t = q;
 			/* www. */
 			if ((*t == 'w') && (t[1] == 'w') &&
 				(t[2] == 'w') && (t[3] == '.')) {
@@ -205,55 +208,81 @@ bark("found www.");
 					(*t == '.'))
 						Buffer_addch(domain, *t++);
 bark("domain: %s", Buffer_get(domain));
-			}
-			if (Buffer_is_set(domain) &&
-				((pos = strrchr(Buffer_get(domain), '.')) != NULL) &&
-				/* skip '.' and check TLD */
-				pos[1] && in_vec(pos+1, prefs->auto_tlds)) {
 bark("domain looks valid, checking TLD completer");
 				/* valid TLD completer */
-				if (*t == '/') {
-					/* location */
-					Buffer_addch(url, '/');
-					while (*++t && !isspace(*t) ||
-						/*
-						 * we should instead match any
-						 * amount of punctuation followed
-						 * by whitespace
-						 */
-						(ispunct(*t) && t[1] && !isspace(t[1]))) {
-						Buffer_addch(url, *t);
+				if (Buffer_is_set(domain) &&
+					((pos = strrchr(Buffer_get(domain), '.')) != NULL) &&
+					/* skip '.' and check TLD */
+					pos[1]) {
+					/*
+					 * must match auto TLD if set to
+					 * http:// or not set
+					 * (inherent http link)
+					 */
+					if (Buffer_is_set(proto) &&
+						((strcmp(Buffer_get(proto), "http://") == 0) ||
+						 (strcmp(Buffer_get(proto), "https://") == 0))
+						&& in_vec(pos+1, prefs->auto_tlds)) {
+						if (*t == '/') {
+							/* location */
+							Buffer_addch(url, '/');
+							while ((*++t != '\0') && !isspace(*t) &&
+								/*
+								 * we should instead match any
+								 * amount of punctuation followed
+								 * by whitespace
+								 */
+								((ispunct(*t) && (t[1] != '\0') && !isspace(t[1])) ||
+								!ispunct(*t))) {
+								Buffer_addch(url, *t);
+							}
+						} else {
+							Buffer_free(&url);
+						}
 					}
+				} else {
+					Buffer_free(&domain);
 				}
-			} else {
-				Buffer_free(&domain);
-			}
 bark("url?");
-			if (domain && !in_a_href(s, q) && !in_a(s, q) &&
-				/* if the protocol was found, it must be allowed */
-				((Buffer_is_set(proto) &&
-				in_vec(Buffer_get(proto), prefs->allowed_protos)) ||
-				!Buffer_is_set(proto))) {
+				if (!in_a_href(s, q) && !in_a(s, q) &&
+					/* if the protocol was found, it must be allowed */
+					((Buffer_is_set(proto) &&
+					in_vec(Buffer_get(proto), prefs->allowed_protos)) ||
+					!Buffer_is_set(proto))) {
 bark("found url [proto: %s] [domain: %s] [loc: %s]",
 	Buffer_is_set(proto) ? Buffer_get(proto) : "DEFAULT",
 	Buffer_get(domain), Buffer_is_set(url) ? Buffer_get(url) : "NONE");
-				/* we found a URL, now reconstruct it */
-				Buffer_cat(p, "<a href=\"");
-				if (Buffer_is_set(proto))
-					Buffer_append(p, proto);
-				else
-					Buffer_cat(p, "http://");
+					/* we found a URL, now reconstruct it */
+					Buffer_cat(p, "<a href=\"");
+					if (Buffer_is_set(proto))
+						Buffer_append(p, proto);
+					else
+						Buffer_cat(p, "http://");
+					
+					Buffer_append(p, domain);
+					if (Buffer_is_set(url)) {
+bark("URL found");
+						Buffer_append(p, url);
+					} else {
+bark("no URL found");
+						Buffer_addch(p, '/');
+					}
 				
-				Buffer_append(p, domain);
-				Buffer_append(p, url);
-				
-				Buffer_cat(p, "\">");
-				Buffer_cat_range(p, q, t);
-				Buffer_cat(p, "</a>");
-
-				q = t;
+					Buffer_cat(p, "\">");
+					Buffer_cat_range(p, q, t);
+					Buffer_cat(p, "</a>");
+	
+					q = t;
+				}
 			}
 			Buffer_addch(p, *q);
+
+			if (Buffer_is_set(proto))
+				Buffer_free(&proto);
+			if (Buffer_is_set(domain))
+				Buffer_free(&domain);
+			if (Buffer_is_set(url))
+				Buffer_free(&url);
 		}
 		free(r);
 		r = Buffer_get(p);
@@ -339,6 +368,8 @@ bark("newlines fixed, doing run-ons now");
 	r = Buffer_get(p);
 	Buffer_long_free(&p, TRUE);
 }
+
+bark("original: %s", s);
 
 	return r;
 }

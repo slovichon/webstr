@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-	char *p, **q;
+	char *p,*q;
 	struct webstr_prefs prefs;
 	prefs.auto_urls = TRUE;
 	prefs.max_chars = 20;
@@ -29,15 +29,14 @@ int main(int argc, char *argv[])
 //	"here are some <invalid> tags </invalid>\n"
 //	"here are some <valid> tags </valid>\n"
 //	"here is some \"miscellaneous\" & inappropriate >content<\n"
-	" asdf http://www.mysite.com/foobar.html jkl;\n"
+	" asdf gopher:comp.unix.bsd.openbsd.pf jkl;\n"
 //	"here is a <tag with=\"an\"> invalid attribute </tag>\n"
 //	"here is a <tag style='bad:css'> yep </tag>\n"
 //	"here is a tag with <a style='attribute'> yep </a>\n"
 //	"here is a link with <a href=\"malicious:foo\"> url </a>\n"
 	//"hereisarunonsentencelalalalalalalalalalalalalalalalalalal\n",
 //	"lalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalalala\n"
-	,
-	STR_ALL, &prefs);
+	, STR_ALL, &prefs);
 
 	printf("parsed: %s\n", p);
 	free(p);
