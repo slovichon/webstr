@@ -31,10 +31,85 @@ static bool in_vec(char *needle, char **hay, int len, bool sens)
 	return FALSE;
 }
 
-static bool in_html_tag(char *needle, char *hay)
+#define __DECR(a) \
+	{ \
+		if ((a) == s) { \
+			/* reached string boundary, couldn't have found it */ \
+			bark("boundary reached"); \
+			return FALSE; \
+		} else \
+			(a)--; \
+	}
+
+/*
+	<a href="sdf">asdf</a>
+*/
+/*
+ * Search for ``<a ...>URL''. `url' here points to somewhere
+ * inside `s' and marks the beginning of the URL.
+ *
+ * I think this also inherently suppresses link spoofing:
+ *
+ *	<a href="url1">url2</a>
+ */
+static bool in_a_tag(char *url, char *s)
 {
-	bool found = FALSE;
-	return found;
+	char *q = url;
+
+	__DECR(q);
+
+	if (*q == '>')
+		/* find beginning of tag */
+		while (q != s)
+			if ((*--q == '<') && ((q[1] == 'a') || (q[1] == 'A')) &&
+			    isspace(q[2])) {
+			    	/* it's a link */
+bark("found end of a tag");
+				return TRUE;
+			} else {
+bark("found end of non-a tag");
+				/* end of tag, and the tag isn't an A */
+				return FALSE;
+			}
+bark("looks good ([%s] in [%s])!", url, s);
+	return FALSE;
+}
+
+/*
+ * Search for ``<a ... href="URL''. `url' here points to
+ * somewhere in `s' and marks the beginning of the target
+ * URL.
+ *
+ * Our str_parse() should have well-formed the HTML so we
+ * shouldn't need to do any strange parsing (such as
+ * optional quotes or whitespace, etc.).
+ */
+static bool in_a_href(char *url, char *s)
+{
+	char *q = url;
+	__DECR(q);
+	if (*q != '"')
+		return FALSE;
+	__DECR(q);
+	if (*q != '=')
+		return FALSE;
+	/* href */
+	__DECR(q);
+	__DECR(q);
+	__DECR(q);
+	__DECR(q);
+	if (strncasecmp(q, "href", 4) != 0)
+		return FALSE;
+	while (q != s)
+		if (*--q == '<')
+			if (((q[1] == 'a') || (q[1] == 'A')) &&
+			    isspace(q[2]))
+				return TRUE;
+			else
+				return FALSE;
+		else
+			return FALSE;
+	return FALSE;
 }
 
 static struct webstr_ent_map map[] = {
@@ -307,7 +382,8 @@ bark("performing HTML parsing on %s", r);
 //bark("ndelim");
 							/* null attr val delimiters */
 							while ((*t != '\0') &&
-								(strchr(" \t\r\n\f", *t) == NULL))
+							       (strchr(" \t\r\n\f", *t) == NULL) &&
+							       (strncmp(t, "&gt;", 4) != 0))
 								Buffer_addch(attrval, *t++);
 						}
 bark("%s='%s'", Buffer_get(attrname), Buffer_get(attrval));
@@ -528,16 +604,16 @@ bark("performing auto URL parsing");
 				}
 //bark("url?");
 				/* should we lookup a DNS record for the domain? */
-				if (!in_html_tag(s, q) &&
+				if (!in_a_tag(q, s) && !in_a_href(q, s) &&
 				    /* if the protocol was found, the TLD must be allowed */
 				    ((Buffer_is_set(proto) &&
 //				    ((strcmp(Buffer_get(proto), "http://") == 0) ||
 //				    (strcmp(Buffer_get(proto), "https://") == 0)) &&
 				    in_vec(Buffer_get(proto), prefs->allowed_protos, 0, TRUE)) ||
 				    !Buffer_is_set(proto))) {
-//bark("found url [proto: %s] [domain: %s] [loc: %s]",
-//	Buffer_is_set(proto) ? Buffer_get(proto) : "DEFAULT",
-//	Buffer_get(domain), Buffer_is_set(url) ? Buffer_get(url) : "NONE");
+bark("found url [proto: %s] [domain: %s] [loc: %s]",
+	Buffer_is_set(proto) ? Buffer_get(proto) : "DEFAULT",
+	Buffer_get(domain), Buffer_is_set(url) ? Buffer_get(url) : "NONE");
 					/* we found a URL, now reconstruct it */
 					Buffer_cat(p, "<a href=\"");
 					if (Buffer_is_set(proto))
