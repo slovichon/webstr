@@ -1,6 +1,7 @@
 /* $Id$ */
 
 #include <math.h>
+#include <string.h>
 
 #include "webstr.h"
 #include "buffer.h"
